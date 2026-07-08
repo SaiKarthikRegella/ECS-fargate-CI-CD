@@ -1,0 +1,15 @@
+__pycache__/
+*.pyc
+.git
+.gitignore
+.flaskenv
+cert.pem
+key.pem
+openssl.cnf
+instance/
+tests/
+requirements-dev.txt
+Dockerfile
+.dockerignore
+*.md
+
