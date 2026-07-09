@@ -50,6 +50,6 @@ jobs:
         run: |
           aws ecs update-service \
             --cluster Flask_application \
-            --service flask-api-service-lbvah26e \
+            --service flask-api-service-0o12uaja \
             --force-new-deployment \
             --region us-east-2
