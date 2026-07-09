@@ -10,7 +10,7 @@ from resources.cart import blp as cartblp
 from blocklist import BlockList
 from flask_jwt_extended import get_jwt_identity
 from models import Usermodel, LogModel
-
+from resources.rate_limiter import check_rate_limit, RATE_LIMIT_REQUESTS, RATE_LIMIT_WINDOW
 
 def create_app(db_url=None):
     app = Flask(__name__)
@@ -127,7 +127,22 @@ def create_app(db_url=None):
             ),
             401,
         )
-
+    
+    @app.before_request
+    def apply_rate_limit():
+        if request.path == '/health':
+            return
+        # Disable rate limiting in test environment
+        if app.config.get('TESTING'):
+            return
+        client_ip = request.headers.get('X-Forwarded-For', request.remote_addr)
+        if client_ip and ',' in client_ip:
+            client_ip = client_ip.split(',')[0].strip()
+        if not check_rate_limit(client_ip):
+            return jsonify({
+                'error': 'rate_limit_exceeded',
+                'message': f'Limit: {RATE_LIMIT_REQUESTS} requests per {RATE_LIMIT_WINDOW}s'
+            }), 429
     with app.app_context():
         db.create_all()
     api = Api(app)
