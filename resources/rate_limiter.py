@@ -6,17 +6,6 @@ import os
 RATE_LIMIT_REQUESTS = int(os.environ.get('RATE_LIMIT_REQUESTS', 10))
 RATE_LIMIT_WINDOW   = int(os.environ.get('RATE_LIMIT_WINDOW', 60))
 
-redis_client = redis.Redis(
-    host=os.environ.get('REDIS_HOST', 'localhost'),
-    port=int(os.environ.get('REDIS_PORT', 6379)),
-    decode_responses=True,
-    socket_connect_timeout=1,
-    socket_timeout=1,
-)
-
-# Atomic Lua script — all three operations run server-side in one round trip.
-# This prevents the race condition where two replicas each read count=limit-1
-# and both admit the request, exceeding the limit by N replicas.
 SLIDING_WINDOW_LUA = """
 local key       = KEYS[1]
 local now       = tonumber(ARGV[1])
@@ -36,12 +25,25 @@ redis.call('EXPIRE', key, math.ceil(window_ms / 1000) + 1)
 return 1
 """
 
+_redis_client = None
 _script = None
+
+def _get_client():
+    global _redis_client
+    if _redis_client is None:
+        _redis_client = redis.Redis(
+            host=os.environ.get('REDIS_HOST', 'localhost'),
+            port=int(os.environ.get('REDIS_PORT', 6379)),
+            decode_responses=True,
+            socket_connect_timeout=1,
+            socket_timeout=1,
+        )
+    return _redis_client
 
 def _get_script():
     global _script
     if _script is None:
-        _script = redis_client.register_script(SLIDING_WINDOW_LUA)
+        _script = _get_client().register_script(SLIDING_WINDOW_LUA)
     return _script
 
 
@@ -58,6 +60,5 @@ def check_rate_limit(client_ip: str) -> bool:
         )
         return bool(allowed)
     except redis.RedisError as e:
-        # Fail open — Redis outage must not take down the API.
         logging.error('Rate limiter Redis error — failing open: %s', e)
         return True
