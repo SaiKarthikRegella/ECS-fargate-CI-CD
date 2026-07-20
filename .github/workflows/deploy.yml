@@ -48,6 +48,15 @@ jobs:
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
           echo "Pushed: $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG"
 
+      - name: Trivy vulnerability scan
+        uses: aquasecurity/trivy-action@master
+        with:
+            image-ref: ${{ steps.login-ecr.outputs.registry }}/flask:${{ github.sha }}
+            format: table
+            exit-code: '1'
+            ignore-unfixed: true
+            severity: CRITICAL
+
       - name: Update ECS task definition and deploy
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
@@ -89,3 +98,11 @@ jobs:
             --region us-east-2
 
           echo "Deployment triggered with revision: $NEW_REVISION"
+
+          echo "Waiting for service to stabilise..."
+          aws ecs wait services-stable \
+            --cluster Flask_application \
+            --services flask-api-service-0o12uaja \
+            --region us-east-2
+
+          echo "Deployment verified — service is stable."
