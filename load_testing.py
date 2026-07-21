@@ -7,3 +7,5 @@ class FlaskApiUser(HttpUser):
     @task
     def health_check(self):
         self.client.get("/health")
+
+#locust -f load_testing.py
