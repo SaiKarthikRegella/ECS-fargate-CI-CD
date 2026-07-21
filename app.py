@@ -18,11 +18,15 @@ def create_app(db_url=None):
     app.config["API_VERSION"] = "v1"
     app.config["OPENAPI_VERSION"] = "3.0.3"
     app.config["OPENAPI_URL_PREFIX"] = "/"
-    app.config["SQLALCHEMY_DATABASE_URI"] = db_url or "sqlite:///data.db"
-    # JWT_SECRET_KEY now comes from the environment. The fallback below is ONLY
-    # for local dev/tests so `pytest` works with zero setup. In ECS this gets
-    # injected via the task definition (or Secrets Manager) — never baked into
-    # the image.
+    app.config["SQLALCHEMY_DATABASE_URI"] = db_url or os.environ.get(
+    "DATABASE_URL", "sqlite:///data.db"
+    )
+    app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
+    "pool_pre_ping": True, 
+    "pool_recycle": 300,     
+    "pool_size": 5,
+    "max_overflow": 10,
+}
     app.config["JWT_SECRET_KEY"] = os.environ.get(
         "JWT_SECRET_KEY", "dev-only-insecure-key-do-not-use-in-prod"
     )
@@ -31,8 +35,6 @@ def create_app(db_url=None):
 
     @app.route("/health")
     def health():
-        # Unauthenticated, no DB hit — this is what the ALB target group polls.
-        # Keep it cheap; if it ever needs a DB check, catch failures and return 503.
         return jsonify({"status": "ok"}), 200
 
     @app.before_request

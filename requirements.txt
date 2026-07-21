@@ -8,3 +8,4 @@ passlib>=1.7.4,<2
 cryptography>=42
 gunicorn>=22,<24
 redis>=5.0,<6
+psycopg2-binary>=2.9,<3
